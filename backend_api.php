@@ -64,9 +64,9 @@ $timesheet_events = $events->fetchAll();
 
 $date1 = strtotime($datetime);
 $date2 = strtotime($timesheet_events[0]['end']);
-$interval = $date2 - $date1;
+$interval = $date1 - $date2;
 
-$times = floor($interval / 60);;
+$times = floor($interval / 60);
 if($times > 5){
 	$stmt = $db->prepare("INSERT INTO events (name, start, end, resource_id) VALUES (:name, :start, :end, :resource)");
 	$stmt->bindParam(':start', $datetime);
