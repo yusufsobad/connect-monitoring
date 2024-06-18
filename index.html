@@ -1,0 +1,224 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>JavaScript/HTML5 Timesheet (PHP, MySQL)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- page layout -->
+  <style type="text/css">
+      p, body, td, input, select, button { font-family: -apple-system,system-ui,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size: 14px; }
+    body { padding: 0px; margin: 0px; background-color: #ffffff; }
+    a { color: #1155a3; }
+    .space { margin: 10px 0px 10px 0px; }
+    .header { background: #003267; background: linear-gradient(to right, #011329 0%,#00639e 44%,#011329 100%); padding:20px 10px; color: white; box-shadow: 0px 0px 10px 5px rgba(0,0,0,0.75); }
+    .header a { color: white; }
+    .header h1 a { text-decoration: none; }
+    .header h1 { padding: 0px; margin: 0px; }
+    .main { padding: 10px; margin-top: 10px; }
+    .generated { color: #999; margin: 5px 0px; }
+    .generated a { color: #999; }
+  </style>
+
+  <style>
+    body, input, select, button {
+      font-size: 14px;
+    }
+
+    select {
+      padding: 5px;
+    }
+
+  </style>
+
+  <!-- DayPilot library -->
+  <script src="js/daypilot/daypilot-all.min.js"></script>
+
+</head>
+<body>
+<div class="header">
+  <h1><a href='https://code.daypilot.org/46581/html5-timesheet-javascript-php'>JavaScript/HTML5 Timesheet (PHP, MySQL)</a></h1>
+  <div><a href="https://javascript.daypilot.org/">DayPilot for JavaScript</a> - HTML5 Calendar/Scheduling Components for JavaScript/Angular/React/Vue</div>
+</div>
+
+<div class="main">
+  <div class="space">
+    Lokasi: <select id="employee"></select>
+  </div>
+
+  <div id="dp"></div>
+
+  <div class="generated">Generated using <a href="https://builder.daypilot.org/">DayPilot UI Builder</a>.</div>
+</div>
+
+<script type="text/javascript">
+  const dp = new DayPilot.Scheduler("dp");
+
+  dp.viewType = "Days";
+  dp.startDate = DayPilot.Date.today().firstDayOfMonth();// "2024-05-01 00:00:00";
+  dp.days = dp.startDate.daysInMonth(); // 31
+
+  dp.timeHeaders = [
+    { groupBy: "Day", format: "MMMM yyyy" },
+    { groupBy: "Hour"},
+	{
+      groupBy: "Cell",
+      format: "mm",
+    }
+  ];
+
+//  dp.heightSpec = "Max";
+//  dp.height = 400;
+
+//  dp.cellWidthSpec = "Auto";
+
+  dp.rowHeaderColumns = [
+    { title: "Day", width: 100},
+    { title: "Uptime", width: 80}
+  ];
+
+  dp.onBeforeRowHeaderRender = (args) => {
+    args.row.columns[1].html = args.row.events.totalDuration().toString("h:mm");
+  };
+  
+  // Tambahan by Yusuf Eko N.
+  dp.cellWidthSpec = "Fixed";
+  dp.cellWidth = 30;
+  dp.crosshairType = "Header";
+  dp.autoScroll = "Drag";
+  
+  dp.scale = "CellDuration";
+  dp.cellDuration = 15;
+  
+  dp.businessBeginsHour = 0;
+  dp.businessEndsHour = 24;
+  dp.businessWeekends = true;
+  
+  dp.floatingEvents = true;
+  dp.eventHeight = 35;
+  dp.eventMovingStartEndEnabled = false;
+  dp.eventResizingStartEndEnabled = false;
+  dp.timeRangeSelectingStartEndEnabled = false;
+  dp.groupConcurrentEvents = false;
+  dp.eventStackingLineHeight = 100;
+  dp.allowEventOverlap = false;
+  dp.timeRangeSelectedHandling = "Disabled";
+  dp.eventMoveHandling = "Disabled";
+  dp.eventResizeHandling = "Disabled";
+  dp.eventDeleteHandling = "Disabled";
+  dp.eventClickHandling = "Disabled";
+  dp.eventHoverHandling = "Disabled";
+
+  // http://api.daypilot.org/daypilot-scheduler-oneventmoved/
+  dp.onEventMoved = async (args) => {
+    const data = {
+      id: args.e.id(),
+      newStart: args.newStart,
+      newEnd: args.newEnd,
+    };
+    await DayPilot.Http.post("backend_move.php", data);
+    dp.message("Moved.");
+  };
+
+  // http://api.daypilot.org/daypilot-scheduler-oneventresized/
+  dp.onEventResized = async (args) => {
+    const data = {
+      id: args.e.id(),
+      newStart: args.newStart,
+      newEnd: args.newEnd
+    };
+    await DayPilot.Http.post("backend_resize.php", data);
+    dp.message("Resized.");
+  };
+
+  // event creating
+  // http://api.daypilot.org/daypilot-scheduler-ontimerangeselected/
+  dp.onTimeRangeSelected = async (args) => {
+    const modal = await DayPilot.Modal.prompt("New event name:", "Event");
+
+    dp.clearSelection();
+    if (modal.canceled) {
+      return;
+    }
+
+    const data = {
+      start: args.start,
+      end: args.end,
+      resource: document.querySelector("#employee").value,
+      name: modal.result
+    };
+    const {data: result} = await DayPilot.Http.post("backend_create.php", data);
+
+    const e = {
+      start: args.start,
+      end: args.end,
+      id: result.id,
+      resource: args.resource,
+      text: modal.result
+    };
+    dp.events.add(e);
+
+    dp.message(result.message);
+
+  };
+
+  dp.onEventClick = async (args) => {
+
+    const modal = await DayPilot.Modal.prompt("Event name:", args.e.text());
+
+    if (modal.canceled) {
+      return;
+    }
+
+    const e = args.e;
+
+    const data = {
+      id: e.id(),
+      name: modal.result
+    };
+    const {data: result} = await DayPilot.Http.post("backend_update.php", data);
+    e.data.text = modal.result;
+    dp.events.update(e);
+    dp.message(result.message);
+
+  };
+
+  dp.init();
+
+  loadResources();
+
+  document.querySelector("#employee").addEventListener("change", (ev) => {
+    loadEvents(true);
+  });
+
+  async function loadResources() {
+    const {data} = await DayPilot.Http.get("backend_resources.php");
+    var select = document.querySelector("#employee");
+    data.forEach(function(item) {
+      var option = document.createElement("option");
+      option.value = item.id;
+      option.innerText = item.name;
+      select.appendChild(option);
+    });
+    loadEvents(true);
+  }
+
+  function loadEvents(message) {
+    const employee = document.querySelector("#employee").value;
+    const start = dp.visibleStart();
+    const end = dp.visibleEnd();
+    const url = `backend_events.php?resource=${employee}`;
+    dp.events.load(url, () => {
+		if(message){
+			dp.message("Events loaded");
+		}
+    });
+  }
+  
+  setInterval(function(){
+	loadEvents(false);
+  }, 60000);
+
+</script>
+
+</body>
+</html>
