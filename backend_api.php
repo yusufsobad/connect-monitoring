@@ -68,10 +68,12 @@ $interval = $date1 - $date2;
 
 $times = floor($interval / 60);
 if($times > 5){
+	$name = "Online";
+	
 	$stmt = $db->prepare("INSERT INTO events (name, start, end, resource_id) VALUES (:name, :start, :end, :resource)");
 	$stmt->bindParam(':start', $datetime);
 	$stmt->bindParam(':end', $datetime);
-	$stmt->bindParam(':name', 'Online');
+	$stmt->bindParam(':name', $name);
 	$stmt->bindParam(':resource', $resource);
 	$stmt->execute();
 }else{
